@@ -11,26 +11,27 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+
 import dj_database_url
 import environ
-env = environ.Env()
-environ.Env.read_env()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+# Settings are read from environment variables, optionally loaded from
+# pet_world/.env. Every variable has a local-development default, so the
+# project runs with no .env at all (see .env.example).
+env = environ.Env()
+environ.Env.read_env(BASE_DIR / 'pet_world' / '.env')
 
 # SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-local-development-key-change-me')
 
-SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool('DEBUG', default=True)
 
-ALLOWED_HOSTS = ["*"]
-CSRF_TRUSTED_ORIGINS = ['https://pet-world-p7qt.onrender.com','https://*.127.0.0.1']
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
+CSRF_TRUSTED_ORIGINS = ['https://pet-world-p7qt.onrender.com', 'https://*.127.0.0.1']
 
 
 # Application definition
@@ -86,13 +87,10 @@ WSGI_APPLICATION = 'pet_world.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Replace the SQLite DATABASES configuration with PostgreSQL:
-
+# Reads DATABASE_URL from the environment; falls back to local SQLite.
 DATABASES = {
     'default': dj_database_url.config(
-        # Reads DATABASE_URL from the environment; falls back to local SQLite.
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-
     )
 }
 
@@ -137,21 +135,22 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-from pathlib import Path
-import environ
-import dj_database_url
-STATIC_URL = 'static/'
-STATICFILES_DIRS = [
-    BASE_DIR/'static',
-]
+# Uploaded pet and profile images
 MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
-env = environ.Env()
-environ.Env.read_env()
+LOGIN_URL = 'user_login'
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_USE_TLS = True
-EMAIL_PORT = 587
-EMAIL_HOST_USER = env("EMAIL")
-EMAIL_HOST_PASSWORD = env("EMAIL_PASSWORD")
+# Email: SMTP (Gmail) when EMAIL is set, otherwise emails (including account
+# activation links) are printed to the console so everything works locally.
+EMAIL_HOST_USER = env('EMAIL', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_PASSWORD', default='')
+if EMAIL_HOST_USER:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.gmail.com'
+    EMAIL_USE_TLS = True
+    EMAIL_PORT = 587
+    DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = 'Pet World <no-reply@pet-world.local>'
