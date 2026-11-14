@@ -7,8 +7,8 @@ class RegistrationForm(UserCreationForm):
     first_name = forms.CharField(widget=forms.TextInput(attrs={'id': 'required'}))
     last_name = forms.CharField(widget=forms.TextInput(attrs={'id': 'required'}))
     email = forms.EmailField(label='Email Address', widget=forms.EmailInput(attrs={'id': 'required'}))
-    contact_number = forms.CharField(label='Contact Number')
-    address = forms.CharField(label='Address')
+    contact_number = forms.CharField(label='Contact Number', max_length=11)
+    address = forms.CharField(label='Address', max_length=200)
     image = forms.ImageField(required=False)
     class Meta:
         model = User
@@ -38,9 +38,9 @@ class RegistrationForm(UserCreationForm):
         
 
 class ChangeUserForm(UserChangeForm):
-
-    contact_number = forms.CharField(label='Contact Number')
-    address = forms.CharField(label='Address')
+    password = None
+    contact_number = forms.CharField(label='Contact Number', max_length=11)
+    address = forms.CharField(label='Address', max_length=200)
     class Meta:
         model = User
         fields = ['username', 'first_name', 'last_name', 'email', 'contact_number', 'address']
