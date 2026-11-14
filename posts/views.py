@@ -1,18 +1,16 @@
-from django.shortcuts import redirect, render
-from . import forms
-from . import models
-from django.contrib.auth.decorators import login_required
-from django.template.loader import render_to_string
-from django.conf import settings
 from django.contrib import messages
-from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
-from django.views.generic import CreateView,UpdateView,DeleteView,DetailView
-from posts.models import Post
+from django.db import transaction
+from django.http import HttpResponseForbidden
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
+from django.views.generic import DetailView
+
 from user_profile.models import Profile
-from transactions.models import Transaction
-from django.shortcuts import redirect
-from django.urls import reverse
+
+from . import forms
+from .models import Post
+
 
 @login_required
 def add_post(request):
@@ -23,75 +21,107 @@ def add_post(request):
             post.author = request.user
             post.save()
             post_form.save_m2m()
-            messages.success(request, 'Post has been added!!')
-            return redirect('homepage')
+            messages.success(request, 'Your pet has been listed for adoption.')
+            return redirect('post_details', id=post.id)
     else:
         post_form = forms.PostForm()
-    return render(request, 'add_post.html', {'form': post_form})
+    return render(request, 'add_post.html', {'form': post_form, 'title': 'List a Pet'})
 
 
 @login_required
 def edit_post(request, id):
-    post = models.Post.objects.get(pk=id)
+    post = get_object_or_404(Post, pk=id)
+    if post.author != request.user:
+        return HttpResponseForbidden('You can only edit your own listings.')
     if request.method == 'POST':
         post_form = forms.EditPostForm(request.POST, request.FILES, instance=post)
         if post_form.is_valid():
             post_form.save()
-            messages.success(request, 'Post updated!!')
-            return redirect('homepage')
+            messages.success(request, 'Listing updated.')
+            return redirect('post_details', id=post.id)
     else:
         post_form = forms.EditPostForm(instance=post)
-    return render(request, 'add_post.html', {'form': post_form})
+    return render(request, 'add_post.html', {'form': post_form, 'title': 'Edit Listing'})
 
 
 @login_required
+@require_POST
 def delete_post(request, id):
-    post = models.Post.objects.get(pk=id)
+    post = get_object_or_404(Post, pk=id)
+    if post.author != request.user:
+        return HttpResponseForbidden('You can only delete your own listings.')
     post.delete()
-    messages.success(request, 'Post has been deleted!!')
-    return redirect('homepage')
-
-# @method_decorator(login_required, name='dispatch')
+    messages.success(request, 'Listing deleted.')
+    return redirect('profile')
 
 
 class DetailPostView(DetailView):
-    model = models.Post
+    model = Post
     pk_url_kwarg = 'id'
     template_name = 'post_details.html'
-    
-    def post(self, request, *args, **kwargs):
-        comment_form = forms.CommentForm(data=self.request.POST)
-        post = self.get_object()
-        
-        if request.user in post.buyers.all():
-            if comment_form.is_valid():
-                new_comment = comment_form.save(commit=False)
-                new_comment.post = post
-                new_comment.save()
-        else:
-            return redirect(reverse('post_detail', kwargs={'id': post.id}))
 
-        return self.get(request, *args, **kwargs)
-    
+    def post(self, request, *args, **kwargs):
+        post = self.get_object()
+        if not request.user.is_authenticated:
+            return redirect('user_login')
+        if not post.buyers.filter(pk=request.user.pk).exists():
+            messages.error(request, 'Only the adopter of this pet can comment on it.')
+            return redirect('post_details', id=post.id)
+
+        comment_form = forms.CommentForm(data=request.POST)
+        if comment_form.is_valid():
+            new_comment = comment_form.save(commit=False)
+            new_comment.post = post
+            new_comment.name = request.user.get_full_name() or request.user.username
+            new_comment.email = request.user.email
+            new_comment.save()
+            messages.success(request, 'Your comment has been added.')
+            return redirect('post_details', id=post.id)
+
+        self.object = post
+        context = self.get_context_data(object=post)
+        context['comment_form'] = comment_form
+        return self.render_to_response(context)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         post = self.object
-        comments = post.comments.all()
-        comment_form = forms.CommentForm()
-        
-        context['comments'] = comments
-        context['comment_form'] = comment_form
-        context['can_comment'] = self.request.user in post.buyers.all()
+        user = self.request.user
+        context['comments'] = post.comments.order_by('-created_on')
+        context['comment_form'] = forms.CommentForm()
+        context['can_comment'] = user.is_authenticated and post.buyers.filter(pk=user.pk).exists()
         return context
 
 
+@login_required
+@require_POST
 def update_pet(request, id):
-    post = Post.objects.get(pk=id)
-    post.is_available = False
-    post.buyers.add(request.user)
-    post.save()
-    user_account = Profile.objects.get(user=request.user)
-    user_account.balance -= post.price
-    user_account.save()
-    messages.success(request, 'Successfully adopted!!')
-    return redirect("homepage")
+    """Adopt a pet: pay its price from the user's balance."""
+    post = get_object_or_404(Post, pk=id)
+
+    if post.author == request.user:
+        messages.error(request, 'You cannot adopt your own pet.')
+        return redirect('post_details', id=post.id)
+
+    with transaction.atomic():
+        post = Post.objects.select_for_update().get(pk=post.pk)
+        profile, _ = Profile.objects.select_for_update().get_or_create(user=request.user)
+
+        if not post.is_available:
+            messages.error(request, 'This pet has already been adopted.')
+            return redirect('post_details', id=post.id)
+        if profile.balance < post.price:
+            messages.error(
+                request,
+                f'Insufficient balance. {post.title} costs {post.price}$ and you have {profile.balance}$.'
+            )
+            return redirect('post_details', id=post.id)
+
+        profile.balance -= post.price
+        profile.save(update_fields=['balance'])
+        post.is_available = False
+        post.save(update_fields=['is_available'])
+        post.buyers.add(request.user)
+
+    messages.success(request, f'You adopted {post.title}!')
+    return redirect('post_details', id=post.id)
