@@ -1,32 +1,33 @@
-{% extends 'base.html' %} 
-{% load crispy_forms_tags %} 
+{% extends 'base.html' %}
 {% load static %}
 
+{% block title %}My Profile{% endblock %}
 {% block static_file %}
 <link rel="stylesheet" href="{% static 'css/profileCard.css' %}">
 {% endblock %}
-  
+
 {% block content %}
 
-
 <div class="container mt-4 mb-4 p-3 d-flex justify-content-center">
-  <div class="card p-4">
+  <div class="card profile-card p-4">
     <div class="image d-flex flex-column justify-content-center align-items-center">
-      <button class="profile-image-btn">
-        <img src="{{ user.profile.image.url }}" height="100" width="100" />
-      </button>
-      <span class="name mt-3">{{ user.get_full_name }}</span>
+      <div class="profile-image-btn d-flex align-items-center justify-content-center overflow-hidden bg-white border">
+        {% if user.profile.image %}
+        <img src="{{ user.profile.image.url }}" height="100" width="100" alt="Profile photo" style="object-fit: cover;" />
+        {% else %}
+        <span class="fs-1 text-muted">{{ user.username|first|upper }}</span>
+        {% endif %}
+      </div>
+      <span class="name mt-3">{{ user.get_full_name|default:user.username }}</span>
       <span class="idd">@{{ user.username }}</span>
       <span class="idd">{{ user.email }}</span>
-      <span class="idd">{{ user.profile.contact_number }}</span>
-      <span class="idd">{{ user.profile.address }}</span>
+      {% if user.profile.contact_number %}<span class="idd">{{ user.profile.contact_number }}</span>{% endif %}
+      {% if user.profile.address %}<span class="idd">{{ user.profile.address }}</span>{% endif %}
       <span class="idd">Balance: {{ user.profile.balance }}$</span>
 
-      <div class="d-flex mt-2">
-        <a class="btn btn-sm btn-primary" href="{% url 'edit_profile' %}">Edit Your Profile</a>
-      </div>
-      <div class="text mt-3">
-        <span>{{ user.profile.bio }}</span>
+      <div class="d-flex gap-2 mt-2">
+        <a class="btn btn-sm btn-primary" href="{% url 'edit_profile' %}">Edit Profile</a>
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'deposit_money' %}">Deposit</a>
       </div>
       <div class="px-2 rounded mt-4 date">
         <span class="join">Joined {{ user.date_joined|date:"F, Y" }}</span>
@@ -35,56 +36,49 @@
   </div>
 </div>
 
-<h4 style="text-align:center">Adopted: </h4>
-<h4 style="text-align:center">{{data | length}} results found</h4>
-
-<div class="col-10 p-3">
-
-  <div class="d-flex flex-wrap pt-5">
+<div class="container">
+  <h4 class="text-center">Adopted pets ({{ data|length }})</h4>
+  <div class="row pt-3">
     {% for post in data %}
-    <div class="col-sm-3">
-      <div class="card m-2">
-        <div style="height: 200px; overflow: hidden;">
-          <img src="{{ post.image.url }}" style="width: 100%; height: 100%; object-fit: cover;" class="card-img-top" alt="...">
-        </div>
+    <div class="col-sm-6 col-lg-3 mb-4">
+      <div class="card h-100">
+        {% include 'pet_card_image.html' %}
         <div class="card-body">
           <h5 class="card-title">{{ post.title }}</h5>
-          <h5 class="card-title">Price: {{ post.price }}$</h5>
-          <a href="{% url 'post_details' post.id %}" class="btn btn-success">Read More</a>
+          <p class="card-text">Price: {{ post.price }}$</p>
+          <a href="{% url 'post_details' post.id %}" class="btn btn-success btn-sm">Read More</a>
         </div>
       </div>
     </div>
+    {% empty %}
+    <p class="text-center text-muted">You have not adopted any pets yet. <a href="{% url 'homepage' %}">Browse pets</a></p>
     {% endfor %}
   </div>
-  
-</div> 
 
-
-
-
-<h4 style="text-align:center">My Adoption Post</h4>
-<h4 style="text-align:center">{{data2 | length}} results found</h4>
-<div class="col-10 m-3 d-flex flex-wrap">
-  {% for post in data2 %}
-  <div class="col-sm-4 mb-4 p-2">
-    <div class="card" style="width: 100%;">
-      <div style="height: 200px; overflow: hidden;">
-        <img src="{{ post.image.url }}" style="width: 100%; height: 100%; object-fit: cover;" class="card-img-top" alt="...">
-      </div>
-      <div class="card-body">
-        <h5 class="card-title">{{ post.title }}</h5>
-        <h5 class="card-title">Price: {{ post.price }}$</h5>
-        <h5 class="card-title">Owner: {{ post.author.get_full_name }}</h5>
-        <a href="{% url 'edit_post' post.id %}" class="btn btn-primary">Edit</a>
-        <a href="{% url 'delete_post' post.id %}" class="btn btn-danger">Delete</a>
-        <a href="{% url 'post_details' post.id %}" class="btn btn-success">Read More</a>
+  <h4 class="text-center mt-4">My listings ({{ data2|length }})</h4>
+  <div class="row pt-3">
+    {% for post in data2 %}
+    <div class="col-sm-6 col-lg-4 mb-4">
+      <div class="card h-100">
+        {% include 'pet_card_image.html' %}
+        <div class="card-body">
+          <h5 class="card-title">{{ post.title }}
+            {% if not post.is_available %}<span class="badge bg-secondary align-middle">Adopted</span>{% endif %}
+          </h5>
+          <p class="card-text">Price: {{ post.price }}$</p>
+          <a href="{% url 'edit_post' post.id %}" class="btn btn-primary btn-sm">Edit</a>
+          <form method="post" action="{% url 'delete_post' post.id %}" class="d-inline" onsubmit="return confirm('Delete this listing?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+          </form>
+          <a href="{% url 'post_details' post.id %}" class="btn btn-success btn-sm">Read More</a>
+        </div>
       </div>
     </div>
+    {% empty %}
+    <p class="text-center text-muted">You have not listed any pets. <a href="{% url 'add_post' %}">List a pet</a></p>
+    {% endfor %}
   </div>
-  {% endfor %}
 </div>
-
-
-
 
 {% endblock %}
