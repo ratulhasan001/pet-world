@@ -1,64 +1,69 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% block title %}{{ post.title }}{% endblock %}
 {% block content %}
 
 <div class="container">
-    <div class="card mb-3 m-3 mx-auto" style="max-width: 1000px;">
-      <div class="row g-0">
-        <div class="col-md-4">
-          <img src="{{ post.image.url }}" class="img-fluid rounded-start" alt="...">
-        </div>
-        <div class="col-md-8">
-          <div class="card-body">
-            <h5 class="card-title">{{ post.title }}</h5>
-            <p class="card-text">{{ post.description }}</p>
-  
-            <h5 class="card-title">Price: {{ post.price }}$</h5>
-            <h3 class="card-title">Owner Details</h3>
-            <h5 class="card-title">{{ post.author.get_full_name }}</h5>
-            <h5 class="card-title">{{ post.author.email }}</h5>
-            <h5 class="card-title">{{ post.author.profile.contact_number }}</h5>
-            <h5 class="card-title">{{ post.author.profile.address }}</h5>
-            
-            {% if user.is_authenticated and post.author.email != user.email %}
-              {% if post.is_available %}
-                {% if user.profile.balance >= post.price %}
-                  <a href="{% url 'adopt_pet' post.id %}" class="btn btn-primary">Adopt</a>
-                {% else %}
-                  <a href="{% url 'adopt_pet' post.id %}" class="btn btn-primary disabled">Insufficient Balance!!</a>
-                {% endif %}
-              {% else %}
-                <a href="{% url 'adopt_pet' post.id %}" class="btn btn-primary disabled">Unavailable!!</a>
-              {% endif %}
+  <div class="card mb-3 mx-auto" style="max-width: 1000px;">
+    <div class="row g-0">
+      <div class="col-md-4">
+        {% if post.image %}
+        <img src="{{ post.image.url }}" class="img-fluid rounded-start" alt="{{ post.title }}">
+        {% else %}
+        <div class="bg-secondary-subtle h-100 d-flex align-items-center justify-content-center p-5 text-muted">No photo</div>
+        {% endif %}
+      </div>
+      <div class="col-md-8">
+        <div class="card-body">
+          <h2 class="card-title h4">{{ post.title }}
+            {% if not post.is_available %}<span class="badge bg-secondary align-middle">Adopted</span>{% endif %}
+          </h2>
+          <p class="text-muted">{{ post.category.name }}</p>
+          <p class="card-text">{{ post.description|linebreaksbr }}</p>
+          <h5>Price: {{ post.price }}$</h5>
+
+          <h3 class="h6 mt-4 text-uppercase text-muted">Owner details</h3>
+          <p class="mb-0">{{ post.author.get_full_name|default:post.author.username }}</p>
+          <p class="mb-0">{{ post.author.email }}</p>
+          {% if post.author.profile.contact_number %}<p class="mb-0">{{ post.author.profile.contact_number }}</p>{% endif %}
+          {% if post.author.profile.address %}<p>{{ post.author.profile.address }}</p>{% endif %}
+
+          <div class="mt-3">
+            {% include 'adopt_button.html' %}
+            {% if user == post.author %}
+            <a href="{% url 'edit_post' post.id %}" class="btn btn-outline-primary">Edit</a>
             {% endif %}
           </div>
         </div>
       </div>
     </div>
   </div>
-  
 
-<div class="card mb-3 m-3 mx-auto" style="max-width: 500px;">
-    <h5 class="p-3">Total Comments : {{comments | length}}</h5>
+  <div class="card mb-3 mx-auto" style="max-width: 700px;">
+    <h5 class="p-3 mb-0">Comments ({{ comments|length }})</h5>
     {% for comment in comments %}
-    <div class="card-body border m-2">
-        <p><b>{{comment.name}}</b> {{comment.created_on}}</p>
-        <p>{{comment.body}}</p>
+    <div class="card-body border-top">
+      <p class="mb-1"><b>{{ comment.name }}</b> <small class="text-muted">{{ comment.created_on|date:"M d, Y H:i" }}</small></p>
+      <p class="mb-0">{{ comment.body|linebreaksbr }}</p>
     </div>
+    {% empty %}
+    <div class="card-body border-top text-muted">No comments yet.</div>
     {% endfor %}
-</div>
-{% if can_comment %}
-<div class="card mb-3 m-3 mx-auto" style="max-width: 500px;">
+  </div>
+
+  {% if can_comment %}
+  <div class="card mb-3 mx-auto" style="max-width: 700px;">
     <div class="card-body">
-        <form method="post">
-            <h1>Add Comment</h1>
-            {% csrf_token %}
-            {{ comment_form|crispy }}
-            <button class="btn btn-warning">Submit</button>
-        </form>
+      <form method="post">
+        <h2 class="h5">Add a comment</h2>
+        {% csrf_token %}
+        {{ comment_form|crispy }}
+        <button class="btn btn-warning">Submit</button>
+      </form>
     </div>
+  </div>
+  {% else %}
+  <p class="text-center text-muted">Only the adopter of this pet can comment on it.</p>
+  {% endif %}
 </div>
-{% else %}
-<p class="text-center" style="color:red">Only adopters can comment on this post.</p>
-{% endif %}
 {% endblock %}
