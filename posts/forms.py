@@ -1,10 +1,6 @@
 from django import forms
+
 from .models import Post, Comment
-from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
-from django.contrib import messages
-from django.contrib.auth.models import User
-from taggit.forms import TagWidget
 
 
 class PostForm(forms.ModelForm):
@@ -13,30 +9,24 @@ class PostForm(forms.ModelForm):
         model = Post
         fields = ['title', 'description', 'category', 'image', 'price']
 
+    def clean_price(self):
+        price = self.cleaned_data.get('price')
+        if price is not None and price < 0:
+            raise forms.ValidationError('Price cannot be negative.')
+        return price
 
-    def save(self, commit=True):
-        post = super(PostForm, self).save(commit=False)
-        if commit:
-            post.save()
-        return post
 
-
-class EditPostForm(forms.ModelForm):
+class EditPostForm(PostForm):
 
     class Meta:
         model = Post
-        fields = ['title', 'description', 'category', 'price']
-
-    def save(self, commit=True):
-        post = super(EditPostForm, self).save(commit=False)
-        if commit:
-            post.save()
-
+        fields = ['title', 'description', 'category', 'image', 'price']
 
 
 class CommentForm(forms.ModelForm):
-    class Meta: 
+    # The commenter's name and email are taken from their account.
+    class Meta:
         model = Comment
-        fields = ['name', 'email', 'body']
-
-
+        fields = ['body']
+        labels = {'body': 'Comment'}
+        widgets = {'body': forms.Textarea(attrs={'rows': 3})}
