@@ -90,8 +90,8 @@ WSGI_APPLICATION = 'pet_world.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        # Replace this value with your local database's connection string.
-        default='postgresql://pet_world_user:Mv0SCaj1QzfrMKS1yViujVy3omOH4hfd@dpg-cqr51abqf0us7394s4og-a.oregon-postgres.render.com/pet_world',
+        # Reads DATABASE_URL from the environment; falls back to local SQLite.
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
 
     )
 }
