@@ -1,1 +1,16 @@
 pet_world/.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Django
+db.sqlite3
+
+# Environment
+.env
+venv/
+.venv/
+
+# macOS
+.DS_Store
