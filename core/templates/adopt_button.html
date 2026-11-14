@@ -1,0 +1,14 @@
+{% if user.is_authenticated and post.author != user %}
+  {% if not post.is_available %}
+    <button type="button" class="btn btn-secondary" disabled>Adopted</button>
+  {% elif user.profile.balance >= post.price %}
+    <form method="post" action="{% url 'adopt_pet' post.id %}" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">Adopt for {{ post.price }}$</button>
+    </form>
+  {% else %}
+    <button type="button" class="btn btn-warning" disabled>Insufficient Balance</button>
+  {% endif %}
+{% elif not user.is_authenticated and post.is_available %}
+  <a href="{% url 'user_login' %}?next={% url 'post_details' post.id %}" class="btn btn-outline-primary">Log in to adopt</a>
+{% endif %}
